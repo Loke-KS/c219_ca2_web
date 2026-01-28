@@ -24,7 +24,7 @@ app.listen(port, () => {
 const cors = require("cors");
 const allowedOrigins = [
     "http://localhost:3000",
-    "https://card-app-starter-rvxg.onrender.com"
+    "https://c219-ca2-web.onrender.com"
 ];
 app.use(
     cors({
