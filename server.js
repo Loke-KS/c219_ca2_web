@@ -91,11 +91,22 @@ app.get('/alltuition', async (req,res) => {
     }
 });
 
-app.get('/alltutor/:id', async (req,res) => {
+app.get('/alltutors/:id', async (req,res) => {
     const { tuition_id } = req.params;
     try {
         let connection = await mysql.createConnection(dbConfig);
         const [rows] = await connection.execute('SELECT * FROM defaultdb.tutor WHERE tuition_id = ?', [tuition_id]);
+        res.json(rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server error for all tutors' });
+    }
+});
+
+app.get('/alltutor', async (req,res) => {
+    try {
+        let connection = await mysql.createConnection(dbConfig);
+        const [rows] = await connection.execute('SELECT * FROM defaultdb.tutor');
         res.json(rows);
     } catch (err) {
         console.error(err);
