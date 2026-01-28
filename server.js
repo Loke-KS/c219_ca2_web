@@ -91,22 +91,11 @@ app.get('/alltuition', async (req,res) => {
     }
 });
 
-app.get('/alltutors/:id', async (req,res) => {
+app.get('/alltutors/:tuition_id', async (req,res) => {
     const { tuition_id } = req.params;
     try {
         let connection = await mysql.createConnection(dbConfig);
         const [rows] = await connection.execute('SELECT * FROM defaultdb.tutor WHERE tuition_id = ?', [tuition_id]);
-        res.json(rows);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Server error for all tutors' });
-    }
-});
-
-app.get('/alltutor', async (req,res) => {
-    try {
-        let connection = await mysql.createConnection(dbConfig);
-        const [rows] = await connection.execute('SELECT * FROM defaultdb.tutor');
         res.json(rows);
     } catch (err) {
         console.error(err);
@@ -126,7 +115,7 @@ app.post('/addtuition', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/addtutor/:id', requireAuth, async (req, res) => {
+app.post('/addtutor/:tuition_id', requireAuth, async (req, res) => {
     const { tuition_id } = req.params;
     const { tutor_name, tutor_rating, tutor_subject, tutor_contact } = req.body;
     try {
@@ -139,7 +128,7 @@ app.post('/addtutor/:id', requireAuth, async (req, res) => {
     }
 });
 
-app.put('/updatetuition/:id', async (req, res) => {
+app.put('/updatetuition/:tuition_id', async (req, res) => {
     const { tuition_id } = req.params;
     const { tuition_name, tuition_rating, tuition_location, tuition_details } = req.body;
     try{
@@ -152,7 +141,7 @@ app.put('/updatetuition/:id', async (req, res) => {
     }
 });
 
-app.put('/updatetutor/:id', async (req, res) => {
+app.put('/updatetutor/:tutor_id', async (req, res) => {
     const { tutor_id } = req.params;
     const { tuition_id, tutor_name, tutor_rating, tutor_subject, tutor_contact } = req.body;
     try{
@@ -165,7 +154,7 @@ app.put('/updatetutor/:id', async (req, res) => {
     }
 });
 
-app.delete('/deletetuition/:id', async (req, res) => {
+app.delete('/deletetuition/:tuition_id', async (req, res) => {
     const { tuition_id } = req.params;
     try{
         let connection = await mysql.createConnection(dbConfig);
@@ -177,7 +166,7 @@ app.delete('/deletetuition/:id', async (req, res) => {
     }
 });
 
-app.delete('/deletetutor/:id', async (req, res) => {
+app.delete('/deletetutor/:tutor_id', async (req, res) => {
     const { tutor_id } = req.params;
     try{
         let connection = await mysql.createConnection(dbConfig);
