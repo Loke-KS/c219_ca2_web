@@ -1,7 +1,12 @@
-const express = require('express');
-const mysql = require('mysql2/promise');
-require('dotenv').config();
-const port = 3000;
+const express = require("express");
+const mysql = require("mysql2/promise");
+require("dotenv").config();
+const port = process.env.PORT || 3000;
+const cors = require("cors");
+const jwt = require("jsonwebtoken");
+
+const allowedOrigins = ["http://localhost:3000"];
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 
 const dbConfig = {
     host: process.env.DB_HOST,
@@ -9,171 +14,150 @@ const dbConfig = {
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     port: process.env.DB_PORT,
-    waitForConnections: true,
-    connectionLimit: 100,
-    queueLimit: 0,
 };
 
 const app = express();
 app.use(express.json());
 
+const DEMO_USER = { id: 1, username: "admin", password: "admin123" };
+const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
+
+function requireAuth(req, res, next) {
+    const header = req.headers.authorization;
+    if (!header) return res.status(401).json({ error: "Missing auth" });
+    const [type, token] = header.split(" ");
+    if (type !== "Bearer" || !token) return res.status(401).json({ error: "Invalid auth" });
+    try {
+        req.user = jwt.verify(token, JWT_SECRET);
+        next();
+    } catch {
+        res.status(401).json({ error: "Invalid/expired token" });
+    }
+}
+
 app.listen(port, () => {
     console.log('Server running on port', port);
 });
 
-const cors = require("cors");
-const allowedOrigins = [
-    "http://localhost:3000",
-    "https://c219-ca2-web.onrender.com"
-];
-app.use(
-    cors({
-        origin: function (origin, callback) {
-            if (!origin) return callback(null, true);
-            if (allowedOrigins.includes(origin)) {
-                return callback(null, true);
-            }
-            return callback(new Error("Not allowed by CORS"));
-        },
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization"],
-        credentials: false,
-    })
-);
-
-const DEMO_USER = { id: 1, username: "admin", password: "admin123" };
-
-const jwt = require("jsonwebtoken");
-const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
-
-app.post("/login", async (req, res) => {
+app.post("/login", (req, res) => {
     const { username, password } = req.body;
-    if (username !== DEMO_USER.username || password !== DEMO_USER.password) {
+    if (username !== DEMO_USER.username || password !== DEMO_USER.password)
         return res.status(401).json({ error: "Invalid credentials" });
-    }
-    const token = jwt.sign(
-        { userId: DEMO_USER.id, username: DEMO_USER.username },
-        JWT_SECRET,
-        { expiresIn: "1h" }
-    );
+    const token = jwt.sign({ userId: DEMO_USER.id }, JWT_SECRET, { expiresIn: "1h" });
     res.json({ token });
 });
 
-function requireAuth(req, res, next) {
-    const header = req.headers.authorization; // "Bearer <token>"
-
-    if (!header) {
-        return res.status(401).json({ error: "Missing Authorization header" });
-    }
-
-    const [type, token] = header.split(" ");
-    if (type !== "Bearer" || !token) {
-        return res.status(401).json({ error: "Invalid Authorization format" });
-    }
-
+app.get("/tuitions", async (req, res) => {
     try {
-        const payload = jwt.verify(token, JWT_SECRET);
-        req.user = payload;
-        next();
-    } catch {
-        return res.status(401).json({ error: "Invalid/Expired token" });
-    }
-}
-
-app.get('/alltuition', async (req,res) => {
-    try {
-        let connection = await mysql.createConnection(dbConfig);
-        const [rows] = await connection.execute('SELECT * FROM defaultdb.tuition');
+        const conn = await mysql.createConnection(dbConfig);
+        const [rows] = await conn.execute("SELECT * FROM tuitions");
         res.json(rows);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: 'Server error for all tuition' });
+        res.status(500).json({ error: "Server error fetching tuitions" });
     }
 });
 
-app.get('/alltutors/:tuition_id', async (req,res) => {
-    const { tuition_id } = req.params;
+app.get("/tuitions/:id", async (req, res) => {
+    const { id } = req.params;
     try {
-        let connection = await mysql.createConnection(dbConfig);
-        const [rows] = await connection.execute('SELECT * FROM defaultdb.tutor WHERE tuition_id = ?', [tuition_id]);
+        const conn = await mysql.createConnection(dbConfig);
+        const [rows] = await conn.execute("SELECT * FROM tuitions WHERE tuition_id = ?", [id]);
+        if (!rows.length) return res.status(404).json({ error: "Tuition not found" });
+        res.json(rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: "Server error fetching tuition" });
+    }
+});
+
+app.post("/tuitions", requireAuth, async (req, res) => {
+    const { tuition_name, tuition_location, tuition_google_link, tuition_details, tuition_subjects, tuition_pricing } = req.body;
+    try {
+        const conn = await mysql.createConnection(dbConfig);
+        await conn.execute(
+            `INSERT INTO tuitions (tuition_name, tuition_location, tuition_google_link, tuition_details, tuition_subjects, tuition_pricing)
+      VALUES (?, ?, ?, ?, ?, ?)`,
+            [tuition_name, tuition_location, tuition_google_link, tuition_details, tuition_subjects, tuition_pricing]
+        );
+        res.status(201).json({ message: "Tuition added" });
+    } catch (err) {
+        res.status(500).json({ error: "Server error adding tuition" });
+    }
+});
+
+app.put("/tuitions/:id", requireAuth, async (req, res) => {
+    const { id } = req.params;
+    const { tuition_name, tuition_location, tuition_google_link, tuition_details, tuition_subjects, tuition_pricing } = req.body;
+    try {
+        const conn = await mysql.createConnection(dbConfig);
+        await conn.execute(
+            `UPDATE tuitions SET tuition_name=?, tuition_location=?, tuition_google_link=?, tuition_details=?, tuition_subjects=?, tuition_pricing=? WHERE tuition_id=?`,
+            [tuition_name, tuition_location, tuition_google_link, tuition_details, tuition_subjects, tuition_pricing, id]
+        );
+        res.json({ message: "Tuition updated" });
+    } catch (err) {
+        res.status(500).json({ error: "Server error updating tuition" });
+    }
+});
+
+app.delete("/tuitions/:id", requireAuth, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const conn = await mysql.createConnection(dbConfig);
+        await conn.execute("DELETE FROM tuitions WHERE tuition_id=?", [id]);
+        res.json({ message: "Tuition deleted" });
+    } catch (err) {
+        res.status(500).json({ error: "Server error deleting tuition" });
+    }
+});
+
+// Tutors
+app.get("/tutors", async (req, res) => {
+    try {
+        const conn = await mysql.createConnection(dbConfig);
+        const [rows] = await conn.execute("SELECT * FROM tutors");
         res.json(rows);
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Server error for all tutors' });
+        res.status(500).json({ error: "Server error fetching tutors" });
     }
 });
 
-app.post('/addtuition', requireAuth, async (req, res) => {
-    const { tuition_name, tuition_rating, tuition_location, tuition_details } = req.body;
+app.post("/tutors", requireAuth, async (req, res) => {
+    const { tutor_name, tutor_subject, tutor_contact, tutor_rating } = req.body;
     try {
-        let connection = await mysql.createConnection(dbConfig);
-        await connection.execute('INSERT INTO tuitions (tuition_name, tuition_rating, tuition_location, tuition_details) VALUES (?, ?, ?, ?)', [tuition_name, tuition_rating, tuition_location, tuition_details]);
-        res.status(201).json({ message: 'Tuition '+tuition_name+' added successfully'});
+        const conn = await mysql.createConnection(dbConfig);
+        await conn.execute(
+            `INSERT INTO tutors (tutor_name, tutor_subject, tutor_contact, tutor_rating) VALUES (?, ?, ?, ?)`,
+            [tutor_name, tutor_subject, tutor_contact, tutor_rating]
+        );
+        res.status(201).json({ message: "Tutor added" });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Server error - could not add tuition '+tuition_name });
+        res.status(500).json({ error: "Server error adding tutor" });
     }
 });
 
-app.post('/addtutor/:tuition_id', requireAuth, async (req, res) => {
-    const { tuition_id } = req.params;
-    const { tutor_name, tutor_rating, tutor_subject, tutor_contact } = req.body;
+app.put("/tutors/:id", requireAuth, async (req, res) => {
+    const { id } = req.params;
+    const { tutor_name, tutor_subject, tutor_contact, tutor_rating } = req.body;
     try {
-        let connection = await mysql.createConnection(dbConfig);
-        await connection.execute('INSERT INTO tutors (tuition_id, tutor_name, tutor_rating, tutor_subject, tutor_contact) VALUES (?, ?, ?, ?, ?)', [tuition_id, tutor_name, tutor_rating, tutor_subject, tutor_contact]);
-        res.status(201).json({ message: 'Tutor '+tutor_name+' added successfully'});
+        const conn = await mysql.createConnection(dbConfig);
+        await conn.execute(
+            `UPDATE tutors SET tutor_name=?, tutor_subject=?, tutor_contact=?, tutor_rating=? WHERE tutor_id=?`,
+            [tutor_name, tutor_subject, tutor_contact, tutor_rating, id]
+        );
+        res.json({ message: "Tutor updated" });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Server error - could not add tutor '+tutor_name });
+        res.status(500).json({ error: "Server error updating tutor" });
     }
 });
 
-app.put('/updatetuition/:tuition_id', async (req, res) => {
-    const { tuition_id } = req.params;
-    const { tuition_name, tuition_rating, tuition_location, tuition_details } = req.body;
-    try{
-        let connection = await mysql.createConnection(dbConfig);
-        await connection.execute('UPDATE tuition SET tuition_name=?, tuition_rating=?, tuition_location=?, tuition_details=? WHERE tuition_id=?', [tuition_name, tuition_rating, tuition_location, tuition_details, tuition_id]);
-        res.status(201).json({ message: 'Tuition ' + tuition_id + ' updated successfully!' });
+app.delete("/tutors/:id", requireAuth, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const conn = await mysql.createConnection(dbConfig);
+        await conn.execute("DELETE FROM tutors WHERE tutor_id=?", [id]);
+        res.json({ message: "Tutor deleted" });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Server error - could not update tuition ' + tuition_id });
-    }
-});
-
-app.put('/updatetutor/:tutor_id', async (req, res) => {
-    const { tutor_id } = req.params;
-    const { tuition_id, tutor_name, tutor_rating, tutor_subject, tutor_contact } = req.body;
-    try{
-        let connection = await mysql.createConnection(dbConfig);
-        await connection.execute('UPDATE tutor SET tuition_id=?, tutor_name=?, tutor_rating=?, tutor_subject=?, tutor_contact=? WHERE tutor_id=?', [tuition_id, tutor_name, tutor_rating, tutor_subject, tutor_contact, tutor_id]);
-        res.status(201).json({ message: 'Tutor ' + tutor_id + ' updated successfully!' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Server error - could not update tutor ' + tutor_id });
-    }
-});
-
-app.delete('/deletetuition/:tuition_id', async (req, res) => {
-    const { tuition_id } = req.params;
-    try{
-        let connection = await mysql.createConnection(dbConfig);
-        await connection.execute('DELETE FROM tuition WHERE id=?', [tuition_id]);
-        res.status(201).json({ message: 'Tuition ' + tuition_id + ' deleted successfully!' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Server error - could not delete tuition ' + tuition_id });
-    }
-});
-
-app.delete('/deletetutor/:tutor_id', async (req, res) => {
-    const { tutor_id } = req.params;
-    try{
-        let connection = await mysql.createConnection(dbConfig);
-        await connection.execute('DELETE FROM tutor WHERE id=?', [tutor_id]);
-        res.status(201).json({ message: 'Tutor ' + tutor_id + ' deleted successfully!' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Server error - could not delete tutor ' + tutor_id });
+        res.status(500).json({ error: "Server error deleting tutor" });
     }
 });
