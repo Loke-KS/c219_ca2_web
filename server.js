@@ -16,7 +16,7 @@ const dbConfig = {
 const app = express();
 app.use(express.json());
 
-const allowedOrigins = ["http://localhost:3000"];
+const allowedOrigins = ["http://localhost:3000", "https://team3-ca2-webapp.vercel.app/"];
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 
 const DEMO_USER = { id: 1, username: "admin", password: "admin123" };
@@ -75,8 +75,7 @@ app.post("/tuitions", requireAuth, async (req, res) => {
     try {
         const conn = await mysql.createConnection(dbConfig);
         await conn.execute(
-            `INSERT INTO tuitions (tuition_name, tuition_location, tuition_google_link, tuition_details, tuition_subjects, tuition_pricing)
-      VALUES (?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO tuitions (tuition_name, tuition_location, tuition_google_link, tuition_details, tuition_subjects, tuition_pricing) VALUES (?, ?, ?, ?, ?, ?)`,
             [tuition_name, tuition_location, tuition_google_link, tuition_details, tuition_subjects, tuition_pricing]
         );
         res.status(201).json({ message: "Tuition added" });
