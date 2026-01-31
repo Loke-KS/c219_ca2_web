@@ -5,9 +5,6 @@ const port = process.env.PORT || 3000;
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 
-const allowedOrigins = ["http://localhost:3000"];
-app.use(cors({ origin: allowedOrigins, credentials: true }));
-
 const dbConfig = {
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
@@ -18,6 +15,9 @@ const dbConfig = {
 
 const app = express();
 app.use(express.json());
+
+const allowedOrigins = ["http://localhost:3000"];
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 
 const DEMO_USER = { id: 1, username: "admin", password: "admin123" };
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
