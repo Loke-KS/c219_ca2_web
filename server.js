@@ -16,7 +16,7 @@ const dbConfig = {
 const app = express();
 app.use(express.json());
 
-const allowedOrigins = ["http://localhost:3000", "https://team3-ca2-webapp.vercel.app/"];
+const allowedOrigins = ["http://localhost:3000", "https://team3-ca2-webapp.vercel.app"];
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 
 const DEMO_USER = { id: 1, username: "admin", password: "admin123" };
